@@ -13,6 +13,37 @@ const Tracking = () => {
   const [aiSuggestion, setAiSuggestion] = useState<string>("");
   const navigate = useNavigate();
 
+  const generateLocalInsight = (latitude: number, longitude: number) => {
+    // Simple rule-based system for location insights
+    const timeOfDay = new Date().getHours();
+    let basicInsight = "Drive safely and maintain proper distance from other vehicles. ";
+    
+    // Time-based suggestions
+    if (timeOfDay >= 20 || timeOfDay <= 5) {
+      basicInsight += "It's dark outside - ensure your headlights are on and be extra vigilant. ";
+    } else if (timeOfDay >= 6 && timeOfDay <= 9) {
+      basicInsight += "Morning rush hour - expect increased traffic. ";
+    } else if (timeOfDay >= 16 && timeOfDay <= 19) {
+      basicInsight += "Evening rush hour - stay alert for heavy traffic. ";
+    }
+
+    // Location-based basic insights
+    if (latitude > 0) {
+      basicInsight += "Driving in the Northern Hemisphere - watch for seasonal weather changes. ";
+    } else {
+      basicInsight += "Driving in the Southern Hemisphere - watch for seasonal weather changes. ";
+    }
+
+    // Speed and movement suggestions
+    if (navigator.onLine) {
+      basicInsight += "You're connected - real-time traffic data is available. ";
+    } else {
+      basicInsight += "You're offline - drive with extra caution as traffic data is unavailable. ";
+    }
+
+    return basicInsight;
+  };
+
   const startTracking = async () => {
     try {
       const permResult = await Geolocation.checkPermissions();
@@ -25,13 +56,15 @@ const Tracking = () => {
         timeout: 1000
       }, (position) => {
         if (position) {
-          setLocation({
+          const newLocation = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
-          });
+          };
+          setLocation(newLocation);
           
-          // Get AI suggestion based on location
-          fetchAISuggestion(position.coords.latitude, position.coords.longitude);
+          // Generate local insight based on location
+          const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
+          setAiSuggestion(insight);
         }
       });
 
@@ -54,29 +87,11 @@ const Tracking = () => {
   const stopTracking = async () => {
     await Geolocation.clearWatch({ id: '' });
     setIsTracking(false);
+    setAiSuggestion("");
     toast({
       title: "Tracking Stopped",
       description: "Location tracking has been stopped"
     });
-  };
-
-  const fetchAISuggestion = async (latitude: number, longitude: number) => {
-    try {
-      const response = await fetch('/api/location-insights', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: `Given the current location at latitude ${latitude} and longitude ${longitude}, what should the driver be aware of? Keep it short and focused on safety.`
-        })
-      });
-
-      const data = await response.json();
-      setAiSuggestion(data.generatedText);
-    } catch (error) {
-      console.error('Error fetching AI suggestion:', error);
-    }
   };
 
   return (
@@ -86,9 +101,9 @@ const Tracking = () => {
           <h1 className="text-2xl font-bold">Live Tracking</h1>
           <Button
             variant="outline"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/")}
           >
-            Back to Dashboard
+            Back to Home
           </Button>
         </div>
 
@@ -126,7 +141,7 @@ const Tracking = () => {
               <div className="mt-4 bg-primary/10 p-4 rounded-lg">
                 <div className="flex items-center space-x-2 mb-2">
                   <MessageCircle className="h-5 w-5 text-primary" />
-                  <span className="font-medium">AI Assistant:</span>
+                  <span className="font-medium">Driving Assistant:</span>
                 </div>
                 <p className="text-sm text-muted-foreground">{aiSuggestion}</p>
               </div>
