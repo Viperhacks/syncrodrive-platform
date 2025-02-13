@@ -11,6 +11,7 @@ const Tracking = () => {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string>("");
+  const [watchId, setWatchId] = useState<string | number | null>(null);
   const navigate = useNavigate();
 
   const generateLocalInsight = (latitude: number, longitude: number) => {
@@ -46,27 +47,58 @@ const Tracking = () => {
 
   const startTracking = async () => {
     try {
-      const permResult = await Geolocation.checkPermissions();
-      if (permResult.location !== 'granted') {
-        await Geolocation.requestPermissions();
-      }
-
-      const watchId = await Geolocation.watchPosition({
-        enableHighAccuracy: true,
-        timeout: 1000
-      }, (position) => {
-        if (position) {
-          const newLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-          setLocation(newLocation);
-          
-          // Generate local insight based on location
-          const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
-          setAiSuggestion(insight);
+      // Try Capacitor Geolocation first
+      try {
+        const permResult = await Geolocation.checkPermissions();
+        if (permResult.location !== 'granted') {
+          await Geolocation.requestPermissions();
         }
-      });
+
+        const watchId = await Geolocation.watchPosition({
+          enableHighAccuracy: true,
+          timeout: 1000
+        }, (position) => {
+          if (position) {
+            const newLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            };
+            setLocation(newLocation);
+            const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
+            setAiSuggestion(insight);
+          }
+        });
+        setWatchId(watchId);
+      } catch (capacitorError) {
+        // Fallback to browser geolocation if Capacitor fails
+        console.log("Falling back to browser geolocation");
+        if ('geolocation' in navigator) {
+          const id = navigator.geolocation.watchPosition(
+            (position) => {
+              const newLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              };
+              setLocation(newLocation);
+              const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
+              setAiSuggestion(insight);
+            },
+            (error) => {
+              console.error('Geolocation error:', error);
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to get location. Please enable location services."
+              });
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 1000
+            }
+          );
+          setWatchId(id);
+        }
+      }
 
       setIsTracking(true);
       toast({
@@ -85,7 +117,21 @@ const Tracking = () => {
   };
 
   const stopTracking = async () => {
-    await Geolocation.clearWatch({ id: '' });
+    try {
+      if (watchId !== null) {
+        // Try to clear Capacitor watch
+        try {
+          await Geolocation.clearWatch({ id: watchId as string });
+        } catch {
+          // If Capacitor fails, clear browser watch
+          navigator.geolocation.clearWatch(watchId as number);
+        }
+      }
+    } catch (error) {
+      console.error('Error stopping tracking:', error);
+    }
+
+    setWatchId(null);
     setIsTracking(false);
     setAiSuggestion("");
     toast({
@@ -93,6 +139,15 @@ const Tracking = () => {
       description: "Location tracking has been stopped"
     });
   };
+
+  useEffect(() => {
+    // Cleanup on component unmount
+    return () => {
+      if (watchId !== null) {
+        stopTracking();
+      }
+    };
+  }, [watchId]);
 
   return (
     <Layout>
