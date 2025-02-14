@@ -6,6 +6,17 @@ import { toast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
 import { useNavigate } from "react-router-dom";
 import { Geolocation } from '@capacitor/geolocation';
+import { supabase } from "@/lib/supabase";
+import { useQuery, useMutation } from "@tanstack/react-query";
+
+interface LocationTrack {
+  id: string;
+  user_id: string;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+  notes?: string;
+}
 
 const Tracking = () => {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -13,6 +24,33 @@ const Tracking = () => {
   const [aiSuggestion, setAiSuggestion] = useState<string>("");
   const [watchId, setWatchId] = useState<string | number | null>(null);
   const navigate = useNavigate();
+
+  // Query to fetch user's recent tracks
+  const { data: recentTracks } = useQuery({
+    queryKey: ['location-tracks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('location_tracks')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      return data as LocationTrack[];
+    },
+  });
+
+  // Mutation to save location track
+  const { mutate: saveTrack } = useMutation({
+    mutationFn: async (newTrack: Omit<LocationTrack, 'id' | 'user_id' | 'timestamp'>) => {
+      const { data, error } = await supabase
+        .from('location_tracks')
+        .insert([newTrack]);
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const generateLocalInsight = (latitude: number, longitude: number) => {
     // Simple rule-based system for location insights
@@ -47,6 +85,18 @@ const Tracking = () => {
 
   const startTracking = async () => {
     try {
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Authentication Required",
+          description: "Please log in to start tracking"
+        });
+        navigate("/login");
+        return;
+      }
+
       // Try Capacitor Geolocation first
       try {
         const permResult = await Geolocation.checkPermissions();
@@ -66,6 +116,12 @@ const Tracking = () => {
             setLocation(newLocation);
             const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
             setAiSuggestion(insight);
+
+            // Save location to Supabase
+            saveTrack({
+              latitude: newLocation.latitude,
+              longitude: newLocation.longitude,
+            });
           }
         });
         setWatchId(watchId);
@@ -82,6 +138,12 @@ const Tracking = () => {
               setLocation(newLocation);
               const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
               setAiSuggestion(insight);
+
+              // Save location to Supabase
+              saveTrack({
+                latitude: newLocation.latitude,
+                longitude: newLocation.longitude,
+              });
             },
             (error) => {
               console.error('Geolocation error:', error);
@@ -199,6 +261,22 @@ const Tracking = () => {
                   <span className="font-medium">Driving Assistant:</span>
                 </div>
                 <p className="text-sm text-muted-foreground">{aiSuggestion}</p>
+              </div>
+            )}
+
+            {recentTracks && recentTracks.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-3">Recent Tracks</h3>
+                <div className="space-y-2">
+                  {recentTracks.map((track) => (
+                    <div key={track.id} className="bg-muted p-3 rounded text-sm">
+                      <div>Lat: {track.latitude.toFixed(6)}, Long: {track.longitude.toFixed(6)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(track.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
