@@ -6,8 +6,9 @@ import { toast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
 import { useNavigate } from "react-router-dom";
 import { Geolocation } from '@capacitor/geolocation';
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import Map from "@/components/Map";
 
 interface LocationTrack {
   id: string;
@@ -224,61 +225,67 @@ const Tracking = () => {
           </Button>
         </div>
 
-        <div className="bg-card p-6 rounded-lg shadow-lg">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Compass className="h-5 w-5 text-primary" />
-                <span className="font-medium">Current Location:</span>
-              </div>
-              <Button
-                onClick={isTracking ? stopTracking : startTracking}
-                variant={isTracking ? "destructive" : "default"}
-              >
-                {isTracking ? "Stop Tracking" : "Start Tracking"}
-              </Button>
-            </div>
-
-            {location && (
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-muted p-3 rounded">
-                  <span className="text-muted-foreground">Latitude:</span>
-                  <br />
-                  {location.latitude.toFixed(6)}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="bg-card p-6 rounded-lg shadow-lg">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Compass className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Current Location:</span>
                 </div>
-                <div className="bg-muted p-3 rounded">
-                  <span className="text-muted-foreground">Longitude:</span>
-                  <br />
-                  {location.longitude.toFixed(6)}
-                </div>
+                <Button
+                  onClick={isTracking ? stopTracking : startTracking}
+                  variant={isTracking ? "destructive" : "default"}
+                >
+                  {isTracking ? "Stop Tracking" : "Start Tracking"}
+                </Button>
               </div>
-            )}
 
-            {aiSuggestion && (
-              <div className="mt-4 bg-primary/10 p-4 rounded-lg">
-                <div className="flex items-center space-x-2 mb-2">
-                  <MessageCircle className="h-5 w-5 text-primary" />
-                  <span className="font-medium">Driving Assistant:</span>
+              {location && (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="bg-muted p-3 rounded">
+                    <span className="text-muted-foreground">Latitude:</span>
+                    <br />
+                    {location.latitude.toFixed(6)}
+                  </div>
+                  <div className="bg-muted p-3 rounded">
+                    <span className="text-muted-foreground">Longitude:</span>
+                    <br />
+                    {location.longitude.toFixed(6)}
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{aiSuggestion}</p>
-              </div>
-            )}
+              )}
 
-            {recentTracks && recentTracks.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-3">Recent Tracks</h3>
-                <div className="space-y-2">
-                  {recentTracks.map((track) => (
-                    <div key={track.id} className="bg-muted p-3 rounded text-sm">
-                      <div>Lat: {track.latitude.toFixed(6)}, Long: {track.longitude.toFixed(6)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(track.timestamp).toLocaleString()}
+              {aiSuggestion && (
+                <div className="mt-4 bg-primary/10 p-4 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                    <span className="font-medium">Driving Assistant:</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{aiSuggestion}</p>
+                </div>
+              )}
+
+              {recentTracks && recentTracks.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">Recent Tracks</h3>
+                  <div className="space-y-2">
+                    {recentTracks.map((track) => (
+                      <div key={track.id} className="bg-muted p-3 rounded text-sm">
+                        <div>Lat: {track.latitude.toFixed(6)}, Long: {track.longitude.toFixed(6)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(track.timestamp).toLocaleString()}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+
+          <div className="bg-card p-6 rounded-lg shadow-lg">
+            <Map currentLocation={location} isTracking={isTracking} />
           </div>
         </div>
       </div>
