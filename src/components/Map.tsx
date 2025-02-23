@@ -4,6 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import type { Feature, FeatureCollection, Point } from 'geojson';
 
 interface LocationTrack {
   id: string;
@@ -49,18 +50,20 @@ const Map = ({ currentLocation, isTracking }: {
 
         if (tracks && tracks.length > 0) {
           // Create a GeoJSON feature collection from the tracks
-          const geojson = {
+          const features: Feature<Point>[] = tracks.map((track: LocationTrack) => ({
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [track.longitude, track.latitude],
+            },
+            properties: {
+              timestamp: track.timestamp,
+            },
+          }));
+
+          const geojson: FeatureCollection = {
             type: 'FeatureCollection',
-            features: tracks.map((track: LocationTrack) => ({
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [track.longitude, track.latitude],
-              },
-              properties: {
-                timestamp: track.timestamp,
-              },
-            })),
+            features: features,
           };
 
           // Add the track points to the map

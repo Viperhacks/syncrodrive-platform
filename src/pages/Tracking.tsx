@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Compass, MessageCircle } from "lucide-react";
@@ -43,10 +42,14 @@ const Tracking = () => {
 
   // Mutation to save location track
   const { mutate: saveTrack } = useMutation({
-    mutationFn: async (newTrack: Omit<LocationTrack, 'id' | 'user_id' | 'timestamp'>) => {
+    mutationFn: async (newTrack: { latitude: number; longitude: number }) => {
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase
         .from('location_tracks')
-        .insert([newTrack]);
+        .insert([{
+          ...newTrack,
+          user_id: session?.user?.id,
+        }]);
 
       if (error) throw error;
       return data;
@@ -118,11 +121,8 @@ const Tracking = () => {
             const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
             setAiSuggestion(insight);
 
-            // Save location to Supabase
-            saveTrack({
-              latitude: newLocation.latitude,
-              longitude: newLocation.longitude,
-            });
+            // Save location to Supabase with user_id
+            saveTrack(newLocation);
           }
         });
         setWatchId(watchId);
@@ -140,11 +140,8 @@ const Tracking = () => {
               const insight = generateLocalInsight(newLocation.latitude, newLocation.longitude);
               setAiSuggestion(insight);
 
-              // Save location to Supabase
-              saveTrack({
-                latitude: newLocation.latitude,
-                longitude: newLocation.longitude,
-              });
+              // Save location to Supabase with user_id
+              saveTrack(newLocation);
             },
             (error) => {
               console.error('Geolocation error:', error);
